@@ -241,3 +241,116 @@ export const sales = mysqlTable(
 
 export type Sale = typeof sales.$inferSelect;
 export type InsertSale = typeof sales.$inferInsert;
+
+/**
+ * Representantes de Vendas
+ */
+export const representantes = mysqlTable(
+  "representantes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    codigo: varchar("codigo", { length: 50 }).notNull().unique(),
+    nome: varchar("nome", { length: 255 }).notNull(),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 20 }),
+    userId: int("userId"),
+    metaAnualFat: decimal("metaAnualFat", { precision: 12, scale: 2 }).default("0"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("userIdIdx").on(table.userId),
+    codigoIdx: index("codigoIdx").on(table.codigo),
+  })
+);
+
+export type Representante = typeof representantes.$inferSelect;
+export type InsertRepresentante = typeof representantes.$inferInsert;
+
+/**
+ * Vinculação de Clientes a Representantes
+ */
+export const clientRepresentatives = mysqlTable(
+  "clientRepresentatives",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    clientId: int("clientId").notNull(),
+    representanteId: int("representanteId").notNull(),
+    isPrimary: boolean("isPrimary").default(true),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    clientIdIdx: index("clientIdIdx").on(table.clientId),
+    representanteIdIdx: index("representanteIdIdx").on(table.representanteId),
+  })
+);
+
+export type ClientRepresentative = typeof clientRepresentatives.$inferSelect;
+export type InsertClientRepresentative = typeof clientRepresentatives.$inferInsert;
+
+/**
+ * Soluções (Espécies/Categorias)
+ */
+export const solutions = mysqlTable(
+  "solutions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    codigo: varchar("codigo", { length: 50 }).notNull().unique(),
+    nome: varchar("nome", { length: 255 }).notNull(),
+    especie: varchar("especie", { length: 255 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    codigoIdx: index("codigoIdx").on(table.codigo),
+  })
+);
+
+export type Solution = typeof solutions.$inferSelect;
+export type InsertSolution = typeof solutions.$inferInsert;
+
+/**
+ * Subsoluções
+ */
+export const subsolutions = mysqlTable(
+  "subsolutions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    solutionId: int("solutionId").notNull(),
+    codigo: varchar("codigo", { length: 50 }).notNull(),
+    nome: varchar("nome", { length: 255 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    solutionIdIdx: index("solutionIdIdx").on(table.solutionId),
+  })
+);
+
+export type Subsolution = typeof subsolutions.$inferSelect;
+export type InsertSubsolution = typeof subsolutions.$inferInsert;
+
+/**
+ * Metas Mensais por Representante e Solução
+ */
+export const targetsMeta = mysqlTable(
+  "targetsMeta",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    representanteId: int("representanteId").notNull(),
+    subsolutionId: int("subsolutionId").notNull(),
+    mes: int("mes").notNull(), // 1-12
+    ano: int("ano").notNull(),
+    faturamento: decimal("faturamento", { precision: 12, scale: 2 }).default("0"),
+    volume: decimal("volume", { precision: 12, scale: 2 }).default("0"),
+    percentual: decimal("percentual", { precision: 5, scale: 2 }).default("0"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    representanteIdIdx: index("representanteIdIdx").on(table.representanteId),
+    subsolutionIdIdx: index("subsolutionIdIdx").on(table.subsolutionId),
+    mesAnoIdx: index("mesAnoIdx").on(table.mes, table.ano),
+  })
+);
+
+export type TargetMeta = typeof targetsMeta.$inferSelect;
+export type InsertTargetMeta = typeof targetsMeta.$inferInsert;

@@ -624,3 +624,244 @@ export async function getDashboardMetrics(userId: number) {
     opportunitiesByStage,
   };
 }
+
+
+// ========== CLIENT IMPORT ==========
+
+export async function importClientsFromArray(
+  clientsData: Array<{
+    farmName: string;
+    producerName: string;
+    email?: string;
+    phone?: string;
+    whatsapp?: string;
+    animalType: "bovinos" | "suinos" | "aves" | "equinos" | "outros";
+    animalQuantity?: number;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    notes?: string;
+    representanteCodigo?: string;
+  }>,
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const results = {
+    created: 0,
+    updated: 0,
+    errors: [] as string[],
+  };
+
+  for (const clientData of clientsData) {
+    try {
+      // Check if client already exists (by farmName and producerName)
+      const existing = await db
+        .select()
+        .from(clients)
+        .where(
+          and(
+            eq(clients.farmName, clientData.farmName),
+            eq(clients.producerName, clientData.producerName)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update only non-dynamic fields (email, phone, whatsapp, notes)
+        await db
+          .update(clients)
+          .set({
+            email: clientData.email || existing[0].email,
+            phone: clientData.phone || existing[0].phone,
+            whatsapp: clientData.whatsapp || existing[0].whatsapp,
+            notes: clientData.notes || existing[0].notes,
+          })
+          .where(eq(clients.id, existing[0].id));
+
+        results.updated++;
+      } else {
+        // Create new client
+        await db.insert(clients).values({
+          ...clientData,
+          createdBy: userId,
+          status: "prospect",
+        });
+
+        results.created++;
+      }
+    } catch (error) {
+      results.errors.push(
+        `Erro ao processar ${clientData.farmName}: ${error instanceof Error ? error.message : "Erro desconhecido"}`
+      );
+    }
+  }
+
+  return results;
+}
+
+// ========== REPRESENTANTES ==========
+
+export async function createRepresentante(data: {
+  codigo: string;
+  nome: string;
+  email?: string;
+  phone?: string;
+  userId?: number;
+  metaAnualFat?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { representantes } = await import("../drizzle/schema");
+  return db.insert(representantes).values({
+    ...data,
+    metaAnualFat: data.metaAnualFat ? parseFloat(data.metaAnualFat) : 0,
+  });
+}
+
+export async function getRepresentantes() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { representantes } = await import("../drizzle/schema");
+  return db.select().from(representantes).orderBy(asc(representantes.nome));
+}
+
+export async function getRepresentanteById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { representantes } = await import("../drizzle/schema");
+  const result = await db
+    .select()
+    .from(representantes)
+    .where(eq(representantes.id, id))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateRepresentante(
+  id: number,
+  data: Partial<{
+    codigo: string;
+    nome: string;
+    email: string;
+    phone: string;
+    userId: number;
+    metaAnualFat: string;
+  }>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { representantes } = await import("../drizzle/schema");
+  const updateData: any = { ...data };
+  if (data.metaAnualFat) {
+    updateData.metaAnualFat = parseFloat(data.metaAnualFat);
+  }
+
+  return db.update(representantes).set(updateData).where(eq(representantes.id, id));
+}
+
+// ========== METAS ==========
+
+export async function getMetasByRepresentante(representanteId: number, ano: number = new Date().getFullYear()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { targetsMeta, subsolutions, solutions } = await import("../drizzle/schema");
+
+  return db
+    .select({
+      id: targetsMeta.id,
+      mes: targetsMeta.mes,
+      faturamento: targetsMeta.faturamento,
+      volume: targetsMeta.volume,
+      percentual: targetsMeta.percentual,
+      subsolutionId: targetsMeta.subsolutionId,
+      subsolutionNome: subsolutions.nome,
+      solutionNome: solutions.nome,
+      especie: solutions.especie,
+    })
+    .from(targetsMeta)
+    .innerJoin(subsolutions, eq(targetsMeta.subsolutionId, subsolutions.id))
+    .innerJoin(solutions, eq(subsolutions.solutionId, solutions.id))
+    .where(and(eq(targetsMeta.representanteId, representanteId), eq(targetsMeta.ano, ano)))
+    .orderBy(targetsMeta.mes, subsolutions.nome);
+}
+
+export async function createTargetMeta(data: {
+  representanteId: number;
+  subsolutionId: number;
+  mes: number;
+  ano: number;
+  faturamento: string;
+  volume: string;
+  percentual: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { targetsMeta } = await import("../drizzle/schema");
+  return db.insert(targetsMeta).values({
+    ...data,
+    faturamento: parseFloat(data.faturamento),
+    volume: parseFloat(data.volume),
+    percentual: parseFloat(data.percentual),
+  });
+}
+
+export async function upsertTargetsMeta(
+  representanteId: number,
+  subsolutionId: number,
+  mes: number,
+  ano: number,
+  data: {
+    faturamento: string;
+    volume: string;
+    percentual: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { targetsMeta } = await import("../drizzle/schema");
+
+  const existing = await db
+    .select()
+    .from(targetsMeta)
+    .where(
+      and(
+        eq(targetsMeta.representanteId, representanteId),
+        eq(targetsMeta.subsolutionId, subsolutionId),
+        eq(targetsMeta.mes, mes),
+        eq(targetsMeta.ano, ano)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return db
+      .update(targetsMeta)
+      .set({
+        faturamento: parseFloat(data.faturamento),
+        volume: parseFloat(data.volume),
+        percentual: parseFloat(data.percentual),
+      })
+      .where(eq(targetsMeta.id, existing[0].id));
+  } else {
+    return db.insert(targetsMeta).values({
+      representanteId,
+      subsolutionId,
+      mes,
+      ano,
+      faturamento: parseFloat(data.faturamento),
+      volume: parseFloat(data.volume),
+      percentual: parseFloat(data.percentual),
+    });
+  }
+}

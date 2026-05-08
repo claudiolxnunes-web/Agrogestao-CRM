@@ -15,6 +15,7 @@ import Reports from "./pages/Reports";
 import MetasRepresentantes from "./pages/MetasRepresentantes";
 import MetaRegional from "./pages/MetaRegional";
 import PedidosCarteira from "./pages/PedidosCarteira";
+import ImportClients from "./pages/ImportClients";
 
 function Router() {
   return (
@@ -85,6 +86,13 @@ function Router() {
         )}
       </Route>
       {/* === FIM NOVAS ROTAS === */}
+      <Route path={"/import-clients"}>
+        {() => (
+          <DashboardLayout>
+            <ImportClients />
+          </DashboardLayout>
+        )}
+      </Route>
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

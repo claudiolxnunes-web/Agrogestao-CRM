@@ -28,6 +28,14 @@ import {
   createSale,
   getSales,
   getDashboardMetrics,
+  importClientsFromArray,
+  createRepresentante,
+  getRepresentantes,
+  getRepresentanteById,
+  updateRepresentante,
+  getMetasByRepresentante,
+  createTargetMeta,
+  upsertTargetsMeta,
 } from "./db";
 
 export const appRouter = router({
@@ -401,6 +409,127 @@ export const appRouter = router({
     metrics: protectedProcedure.query(async ({ ctx }) => {
       return getDashboardMetrics(ctx.user.id);
     }),
+  }),
+
+  // ========== CLIENT IMPORT ==========
+  import: router({
+    clients: protectedProcedure
+      .input(
+        z.object({
+          clients: z.array(
+            z.object({
+              farmName: z.string().min(1),
+              producerName: z.string().min(1),
+              email: z.string().email().optional(),
+              phone: z.string().optional(),
+              whatsapp: z.string().optional(),
+              animalType: z.enum(["bovinos", "suinos", "aves", "equinos", "outros"]),
+              animalQuantity: z.number().optional(),
+              address: z.string().optional(),
+              city: z.string().optional(),
+              state: z.string().optional(),
+              zipCode: z.string().optional(),
+              notes: z.string().optional(),
+              representanteCodigo: z.string().optional(),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return importClientsFromArray(input.clients, ctx.user.id);
+      }),
+  }),
+
+  // ========== REPRESENTANTES ==========
+  representantes: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          codigo: z.string().min(1),
+          nome: z.string().min(1),
+          email: z.string().email().optional(),
+          phone: z.string().optional(),
+          userId: z.number().optional(),
+          metaAnualFat: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return createRepresentante(input);
+      }),
+
+    list: protectedProcedure.query(async () => {
+      return getRepresentantes();
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return getRepresentanteById(input.id);
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          codigo: z.string().optional(),
+          nome: z.string().optional(),
+          email: z.string().email().optional(),
+          phone: z.string().optional(),
+          userId: z.number().optional(),
+          metaAnualFat: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        return updateRepresentante(id, data as any);
+      }),
+  }),
+
+  // ========== METAS ==========
+  metas: router({
+    getByRepresentante: protectedProcedure
+      .input(
+        z.object({
+          representanteId: z.number(),
+          ano: z.number().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return getMetasByRepresentante(input.representanteId, input.ano);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          representanteId: z.number(),
+          subsolutionId: z.number(),
+          mes: z.number().min(1).max(12),
+          ano: z.number(),
+          faturamento: z.string(),
+          volume: z.string(),
+          percentual: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return createTargetMeta(input);
+      }),
+
+    upsert: protectedProcedure
+      .input(
+        z.object({
+          representanteId: z.number(),
+          subsolutionId: z.number(),
+          mes: z.number().min(1).max(12),
+          ano: z.number(),
+          faturamento: z.string(),
+          volume: z.string(),
+          percentual: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { representanteId, subsolutionId, mes, ano, ...data } = input;
+        return upsertTargetsMeta(representanteId, subsolutionId, mes, ano, data);
+      }),
   }),
 });
 
